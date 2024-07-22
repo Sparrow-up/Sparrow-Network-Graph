@@ -10,6 +10,16 @@
       src: url('SF-Pro-Display-Black.otf') format('opentype'); /* Path relative to your HTML file */
       /* You can add additional font formats for better browser compatibility */
     }
+
+    @font-face {
+      font-family: 'SFProDisplayMedium';
+      src: url('SF-Pro-Display-Medium.otf') format('opentype');
+    }
+
+    @font-face {
+      font-family: 'SFProRoundedRegular';
+      src: url('SF-Pro-Rounded-Regular.otf') format('opentype');
+    }
   
     body {
       font-family: 'SFPro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
@@ -18,6 +28,9 @@
       padding: 0;
       background-color: #f0f0f0;
       color: #333;
+      justify-content: center; /* Center content horizontally */
+      align-items: center; /* Center content vertically */
+      height: 100vh; /* Full viewport height */
     }
   
     .node-label {
@@ -29,27 +42,81 @@
   
     h1 {
       text-align: center;
-      margin-top: 20px;
+      margin-top: 10px;
       font-family: 'SFPro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
       /* Apply 'SFPro' to headings as well */
     }
   
     #graph-container {
-      width: 100%;
-      height: 1000px;
+      width: 100vw;
+      height: calc(100vh - 100px); /* Adjusted height to leave space for the legend and title */
       border: 1px solid #ccc;
-      margin-top: 20px;
+      position: relative;
+      overflow: hidden;
+      z-index: 0;
     }
-  
+
+    #legend-container {
+      background-color: #fff;
+      padding: 20px;
+      border: 1px solid #ccc;
+      text-align: center;
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      z-index: 1;
+      max-width: 200px; /* Adjust width as needed */
+    }
+
+    .legend-item {
+      margin-bottom: 10px; /* Spacing between legend items */
+    }
+
+  #show-legend {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    cursor: pointer;
+  }
+
+  #search-container {
+  text-align: center;
+  margin-top: 20px;
+  position: fixed;
+  top: 50px;
+  left: 92%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: 240px; /* Adjust width as needed */
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#node-search {
+  padding: 8px;
+  width: 180px;
+  font-size: 14px;
+}
+
     .legend {
+      position: absolute;
       font-size: 14px;
       margin-top: 20px;
       text-align: center;
+      z-index: 1;
+      visibility: 1;
+      opacity: 1; /* Initially visible */
+      pointer-events: auto;
+      transition: opacity 0.3s ease; /* Smooth transition for opacity */
     }
   
     .legend-item {
-      display: inline-block;
-      margin-right: 10px;
+      font-size: 11px;
+      margin-right: 0px;
+
     }
   
     .node {
@@ -70,36 +137,131 @@
     .link.inactive {
       opacity: 0.3; /* Make inactive nodes and links semi-transparent */
     }
+
+    .legend.hidden {
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+    }
   </style>
   
   
 </head>
 <body>
   <h1 style="text-align: center;">Sparrow Gen Framework</h1>
+  
+  <div id="show-legend" onclick="showLegend()">
+    Show Legend
+  </div>
+  
+  <div id="legend-container" class="legend hidden">
+  </div>
+  
+
   <div id="graph-container"></div>
-  <div id="legend-container" class="legend"></div>
+
+  <div id="search-container">
+    <input type="text" id="node-search" placeholder="Search Node Name..." oninput="searchNode()">
+  </div>
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script>
-    // Load data from JSON
-    d3.json("activities2.json").then(function(data) {
-      const nodes = data.nodes;
-      const links = data.links;
 
-      // Set initial positions of nodes closer together
-      nodes.forEach((d, i) => {
-        d.x = Math.random() * 200 + 100;
-        d.y = Math.random() * 200 + 200;
-      });
+    let nodes = [];
+    let links = [];
+
+
+    let clickedActive = false;
+
+    const circleLayouts = {
+      "Activity Type Name": {center: [-700, -200], radius: 100},
+      "Activity Name": {center: [-400, -150], radius: 100},
+      "Excercise Name": {center: [200, 350], radius: 50},
+      "Drill Name": {center: [200, 180], radius: 100},
+      "Skill Name": {center: [-450, 300], radius: 275},
+      "Professional Name": {center: [500, -50], radius: 100},
+      "Equipment Name":{center: [-700, 0], radius: 100},
+      "Brand Name": {center: [450, 200], radius: 100},
+      "Rule Name": {center: [300, 0], radius: 100},
+      "Excercise Type Name": {center: [400, 350], radius: 40},
+      "Motion Name": {center: [250, 470], radius: 100},
+      "Analysis Name": {center: [-100, 200], radius: 100},
+      "Methodology Name": {center: [-400, -370], radius: 100},
+      "Coaching Style Name": {center: [150, -130], radius: 20},
+      "Device Name": {center: [-30, 50], radius: 30},
+      "Mode Name": {center: [70, 90], radius: 30},
+      "Perceptron Model Name": {center: [-200, 50], radius: 50},
+      "Sensor Name": {center: [-110, -100], radius: 50},
+      "User Analysis Name": {center: [-100, 300], radius: 50},
+      "User Condition": {center: [0, -100], radius: 50},
+      "User Expertise": {center: [50, -30], radius: 50},
+      "User Input Name": {center: [150, -50], radius: 50}
+
+
+    }
+
+
+
+
+    function randomPositionInCircle(radius) {
+    const angle = Math.random() * 2 * Math.PI; // Random angle
+    const r = Math.random() * radius; // Random radius
+    return {
+        x: r * Math.cos(angle),
+        y: r * Math.sin(angle),
+    };
+}
+
+d3.json("activities2.json").then(function(data) {
+    console.log("Data loaded:", data); // Check if data is loaded correctly
+    nodes = data.nodes;
+    links = data.links;
+
+    // Check if 'nodes' and 'links' are properly loaded
+    if (nodes && nodes.length > 0) {
+        // Call any functions that rely on 'nodes' here, e.g., searchNode()
+        searchNode(); // Example of calling searchNode after data is loaded
+    } else {
+        console.log("Failed to load or empty 'nodes' array.");
+    }
+
+    nodes.forEach(d => {
+  const layout = circleLayouts[d.type];
+
+  // Calculate a random angle and radius within the circle layout
+  const angle = Math.random() * 2 * Math.PI; // Random angle between 0 and 2π
+  const radius = Math.sqrt(Math.random()) * (layout.radius * 0.5); // Random radius within half the circle radius
+  
+  // Calculate initial x and y coordinates based on angle and radius
+  d.x = layout.center[0] + radius * Math.cos(angle);
+  d.y = layout.center[1] + radius * Math.sin(angle);
+
+  // Ensure nodes stay within the circleLayout boundaries
+  const dx = d.x - layout.center[0];
+  const dy = d.y - layout.center[1];
+  const distance = Math.sqrt(dx * dx + dy * dy);
+
+  if (distance > layout.radius) {
+    // If node is outside the circle, move it back inside
+    const angleInside = Math.atan2(dy, dx);
+    d.x = layout.center[0] + layout.radius * Math.cos(angleInside);
+    d.y = layout.center[1] + layout.radius * Math.sin(angleInside);
+  }
+});
+
+
+links.forEach(link => {
+    link.source = nodes.find(node => node.id === link.source);
+    link.target = nodes.find(node => node.id === link.target);
+});
+
 
       // Create SVG container
-      const svg = d3.select("#graph-container")
+      svg = d3.select("#graph-container")
               .append("svg")
-              .attr("width", "100%")
-              .attr("height", "100%")
-              .attr("viewBox", [0, 0, 800, 600]) 
+              .attr("viewBox", "0, 0, 800, 600") 
               .call(d3.zoom()
-                .scaleExtent([1, 10]) // Define the zoom scale extent
+                .scaleExtent([0.1, 10]) // Define the zoom scale extent
                 .on("zoom", function(event) {
                   svg.attr("transform", event.transform);
                   toggleVisibility(event.transform.k); // Toggle label visibility based on zoom level
@@ -109,11 +271,29 @@
               .append("g");
 
     const colorScheme = {
-                "Activity Type Name": "#E5972A", // Blue
-                "Activity Name": "#F24822",      // Orange
-                "Excercise Name": "#0D99FF",     // Green
-                "Drill Name": "#0D99FF",         // Red
-                "Skill Name": "#9467bd"          // Purple
+                "Activity Type Name": "#E5972A", // Orange
+                "Activity Name": "#F24822",      // Red
+                "Excercise Name": "#0D99FF",     // Blue
+                "Drill Name": "#598BAF",         // Air Force
+                "Skill Name": "#9467bd",          // Purple
+                "Professional Name": "#AFF4C6", // Light Green
+                "Equipment Name": "#FF00A8", // Pink
+                "Brand Name": "#BDE3FF", // Lightish Blue
+                "Rule Name": "#FFC7C2", // Skin 
+                "Excercise Type Name": "#9747FF", // Purple
+                "Motion Name": "#F64A8A", // French Rose
+                "Analysis Name": "#14AE5C", // Dark Green
+                "Methodology Name": "#FFFF00", // Yellow
+                "Analysis Name": "#14AE5C",
+                "Coaching Style Name": "#32e88f", //Emerald Green
+                "Device Name": "#aa5158", //Umber?
+                "Mode Name": "#b30395", // Fuschia
+                "Perceptron Model Name": "#33e217", // Lime Green
+                "Sensor Name": "#7281b8", // Lavender
+                "User Analysis Name": "#c1e44a", //Gatorade Lime
+                "User Condition": "#609fce", //muted blue
+                "User Expertise": "#6f924f", // Military Green
+                "User Input Name": "#a40125" // Barn Red
                 };
 
       // Define color scale for node types
@@ -132,39 +312,45 @@
                     .enter().append("path")
                     .attr("class", "link")
                     .attr("stroke", "#999")
-                    .attr("stroke-width", 0.25)
+                    .attr("stroke-width", 0.075)
                     .attr("fill", "none")
                     .attr("d", d => linkPath({source: d.source, target: d.target}));
-
       // Create nodes
-      const node = svg.append("g")
-                      .selectAll("circle")
-                      .data(nodes)
-                      .enter().append("circle")
-                      .attr("r", d => Math.sqrt(d.size) * 1.5)
-                      .attr("fill", d => colorScale(d.type))
-                      .on("click", clicked) // Add click event listener
-                      .call(d3.drag()
-                        .on("start", dragstarted)
-                        .on("drag", dragged)
-                        .on("end", dragended));
+const node = svg.append("g")
+                .selectAll("circle")
+                .data(nodes)
+                .enter().append("circle")
+                .attr("r", d => Math.sqrt(d.size) * 1.5)
+                .attr("fill", d => colorScale(d.type))
+                .attr("class", d => {
+                  if (d.type === "Activity Type Name") return "node activity-type";
+                  else if (d.type === "Activity Name") return "node activity";
+                  else return "node other";
+                })
 
-      // Add node labels with dynamic font size based on node degree and zoom level
-      const labels = svg.append("g")
-                        .selectAll("text")
-                        .data(nodes)
-                        .enter().append("text")
-                        .attr("class", "node-label")
-                        .attr("dy", d => Math.sqrt(d.size) * 1.5 + 10)
-                        .style("font-size", d => {
-                          if (d.type === "Activity Type Name") return "10px";
-                          if (d.type === "Activity Name") return "7px";
-                          if (d.type === "Excercise Name") return "4px";
-                          if (d.type === "Drill Name") return "4px";
-                          if (d.type === "Skill Name") return "4px";
-                        })
-                        .text(d => d.id)
-                        .style("visibility", "hidden"); // Initially hidden
+// Add node labels with dynamic font size and family based on node type
+const labels = svg.append("g")
+                  .selectAll("text")
+                  .data(nodes)
+                  .enter().append("text")
+                  .attr("class", "node-label")
+                  .attr("dy", d => Math.sqrt(d.size) * 1.5 + 10)
+                  .style("font-size", d => {
+                    // Set font sizes here as needed
+                    // Example:
+                    if (d.type === "Activity Type Name") return "10px";
+                    else if (d.type === "Activity Name") return "7px";
+                    else return "4px";
+                  })
+                  .style("font-family", d => {
+                    // Set font families based on node types
+                    if (d.type === "Activity Type Name") return "'SFProDisplayMedium', sans-serif";
+                    else if (d.type === "Activity Name") return "'SFPro', sans-serif";
+                    else return "'SFProRoundedRegular', sans-serif";
+                  })
+                  .style("alignment-baseline", "middle") // Center align text vertically
+                  .text(d => d.id)
+                  .style("visibility", "hidden"); // Initially hidden
 
       // Create legend
       const legendContainer = d3.select("#legend-container");
@@ -177,46 +363,103 @@
             .text(d => d);
       legend.append("span")
             .text(d => ` (${nodes.filter(node => node.type === d).length} nodes)`);
-
-      // Create force simulations
-      const simulation = d3.forceSimulation(nodes)
-                          .force("link", d3.forceLink(links).id(d => d.id).distance(100))
-                          .force("charge", d3.forceManyBody().strength(-15)) // Increase strength to bring nodes closer together
-                          .force("center", d3.forceCenter(400, 300))
-                          .force("collide", d3.forceCollide().radius(d => Math.sqrt(d.size) * 2 + 10).iterations(2)); // Adjust collide radius as needed
-
-      simulation.on("tick", () => {
-        node.attr("cx", d => d.x)
-            .attr("cy", d => d.y);
-
-        // Update the positions of curved links
-        link.attr("d", d => linkPath({source: d.source, target: d.target}));
-
-        // Update label positions
-        labels.attr("x", d => d.x)
-              .attr("y", d => d.y + Math.sqrt(d.size) / 2); // Adjust label position based on node size
-      });
-
       
+            // Preprocess data: Sort nodes by type
+nodes.sort((a, b) => {
+  if (a.type < b.type) return -1;
+  if (a.type > b.type) return 1;
+  return 0;
+});
 
-      // Functions for drag behavior
-      function dragstarted(event) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        event.subject.fx = event.subject.x;
-        event.subject.fy = event.subject.y;
-      }
+// Define filter for drop shadow
+const filter = svg.append("filter")
+  .attr("id", "drop-shadow")
+  .attr("x", "-20%")
+  .attr("y", "-20%")
+  .attr("width", "140%")
+  .attr("height", "140%");
 
-      function dragged(event) {
-        event.subject.fx = event.x;
-        event.subject.fy = event.y;
-      }
+filter.append("feDropShadow")
+  .attr("dx", "2")
+  .attr("dy", "2")
+  .attr("stdDeviation", "2")
+  .attr("flood-color", "rgba(0, 0, 0, 0.5)");
 
-      function dragended(event) {
-        if (!event.active) simulation.alphaTarget(0);
-        event.subject.fx = null;
-        event.subject.fy = null;
-      }
+// Add cluster labels
+const clusterLabels = svg.selectAll(".cluster-label")
+  .data(Object.keys(circleLayouts))
+  .enter().append("text")
+  .attr("class", "cluster-label")
+  .attr("id", d => `cluster-label-${d.replace(/\s+/g, '-')}`) // ID for each label
+  .attr("x", d => circleLayouts[d].center[0])
+  .attr("y", d => circleLayouts[d].center[1] + 50) // Adjust position as needed
+  .text(d => d)
+  .style("font-family", "'SFPro', sans-serif") // Adjust font-family if needed
+  .style("font-size", "12px") // Adjust font-size as needed
+  .style("text-anchor", "middle")
+  .style("fill", "#333") // Adjust text color as needed
+  .style("visibility", "visible")
+  .style("fill", d => colorScheme[d])
+  .style("stroke", 2)
+  .style("filter", "url(#drop-shadow)");
 
+
+
+function forceTowardsCircleCenter(circleLayouts) {
+    function force(alpha) {
+        nodes.forEach(d => {
+            const layout = circleLayouts[d.type];
+            const dx = layout.center[0] - d.x;
+            const dy = layout.center[1] - d.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const targetRadius = layout.radius * 0.5;
+
+            // Apply force only if the node is outside its target radius
+            if (distance > targetRadius) {
+                const strength = 100; // Adjust the strength as needed
+                d.vx += (dx / distance) * strength * alpha;
+                d.vy += (dy / distance) * strength * alpha;
+            }
+        });
+    }
+
+    return force;
+}
+
+// Define collision force with dynamic radius based on node type
+const collisionForce = d3.forceCollide()
+    .radius(function(d) {
+        if (d.type === "Activity Name") {
+            return 20; // Larger radius for "Activity Name" nodes
+        } else {
+            return 7; // Smaller radius for other types
+        }
+    })
+    .strength(0.7); 
+
+// Update the simulation
+const simulation = d3.forceSimulation(nodes)
+  .force('collide', collisionForce)
+  .force("towardsCenter", forceTowardsCircleCenter(circleLayouts))
+  .on("tick", ticked);
+
+function ticked() {
+  
+  node.attr("cx", d => d.x)
+      .attr("cy", d => d.y);
+
+      link.attr("d", d => {
+        if (d.source && d.target) {
+            return linkPath({ source: d.source, target: d.target });
+        } else {
+            console.warn('Link has undefined source or target:', d);
+            return ""; // or handle it appropriately
+        }
+    });
+
+  labels.attr("x", d => d.x)
+        .attr("y", d => d.y + 5);
+}
       // Function to handle mouse hover over nodes
 function mouseOver(event, d) {
     // Highlight the hovered node
@@ -230,10 +473,13 @@ function mouseOut(event, d) {
 }
 
 function clicked(event, d) {
+  clickedActive = true;
+
   // Reset all nodes and links to normal state
-  node.style("opacity", 0.5).style("font-weight", "normal").style("stroke", "#ccc"); // Gray out non-selected nodes
-  link.style("stroke", "#ccc").style("stroke-width", 0.3);
-  labels.style("visibility", "hidden"); // Hide all labels by default
+  node.style("opacity", 0.4).style("font-weight", "normal").style("stroke", "#ccc"); // Gray out non-selected nodes
+  link.style("stroke", "#ccc").style("stroke-width", 0.075);
+  labels.style("visibility", "hidden") // Hide all labels by default
+  clusterLabels.style("visibility", "hidden");
 
   // Highlight clicked node
   d3.select(this)
@@ -246,6 +492,11 @@ function clicked(event, d) {
   labels.filter(label => label.id === d.id)
     .style("visibility", "visible");
 
+  // Highlight links between clicked node and neighboring nodes
+  link.filter(link => link.source.id === d.id || link.target.id === d.id)
+    .style("stroke", "black")
+    .style("stroke-width", "0.34px");
+
   // Highlight neighboring nodes
   const neighboringNodes = links.reduce((acc, link) => {
     if (link.source.id === d.id) {
@@ -256,26 +507,39 @@ function clicked(event, d) {
     return acc;
   }, []);
 
-  // Log neighboring node IDs for debugging
-  console.log("Neighboring node IDs:", neighboringNodes);
+  console.log(neighboringNodes);
 
   // Apply transformation to neighboring nodes
   node.filter(node => neighboringNodes.includes(node.id))
     .style("opacity", 1) // Make neighboring nodes fully visible
     .style("font-weight", "bold")
     .style("stroke", "black")
-    .style("stroke-width", "2px");
+    .style("stroke-width", "1.05px");
+  
+
+  // Append a drop shadow filter to the SVG
+const filter = svg.append("filter")
+                  .attr("id", "drop-shadow")
+                  .attr("x", "-20%")
+                  .attr("y", "-20%")
+                  .attr("width", "140%")
+                  .attr("height", "140%");
+
+filter.append("feDropShadow")
+      .attr("dx", "1")
+      .attr("dy", "1")
+      .attr("stdDeviation", "1")
+      .attr("flood-color", "rgba(0, 0, 0, 0.5)");
 
   // Show labels for neighboring nodes
   labels.filter(label => neighboringNodes.includes(label.id))
     .style("visibility", "visible");
 
+  
+
   // Prevent event propagation
   event.stopPropagation();
 }
-
-
-
 
 
 // Add event listener for click on nodes
@@ -284,9 +548,15 @@ node.on("click", clicked);
 
 // Function to handle unclick event on the white space
 function unclicked(event) {
+
+  clickedActive = false;
+  
   // Reset all nodes to normal state
   node.style("opacity", 1).style("font-weight", "normal").style("stroke", "none");
-  link.style("stroke", "#333").style("stroke-width", 0.3);
+  link.style("stroke", "#333").style("stroke-width", 0.075);
+  labels.style("visibility", "hidden");
+
+  clusterLabels.style("visibility", "visible");
 }
 
 // Add event listener for click on white space to unclick
@@ -341,25 +611,67 @@ node.on("mouseover", mouseOver).on("mouseout", mouseOut);
       simulation.force("boundaryY", forceY);
 
       // Function to toggle label visibility based on zoom level
-function toggleVisibility(zoomLevel) {
-  labels.style("visibility", d => {
-    if (zoomLevel >= 1 && d.type === "Activity Category") {
+      function toggleVisibility(zoomLevel) {
+        if (clickedActive == false){
+    labels.style("visibility", d => {
+    if (zoomLevel >= 1 && d.type === "Activity Type Name") {
       return "visible";
-    } else if (zoomLevel >= 2 && d.type === "Activity Name X") {
-      return "visible";
-    } else if (zoomLevel >= 3 && d.type === "Skill Name") {
-      return "visible";
-    } else {
-      return "hidden";
-    }
-  });
-
-  // Toggle node visibility based on their size
-  node.style("visibility", d => {
-    return Math.sqrt(d.size) * zoomLevel > 1 ? "visible" : "hidden";
+    } else if (zoomLevel >= 0.25 && d.type === "Activity Name") {
+      return "visible"; // Adjusted zoom level here
+    } else if (zoomLevel >= 1.35) {
+        return "visible"; // Adjusted zoom level here
+      } else {
+        return "hidden";
+      }
   });
 }
+
+}
     });
+  
+    function showLegend() {
+    const legendContainer = document.getElementById("legend-container");
+    const toggleButton = document.getElementById("show-legend");
+
+    // Toggle the hidden class on the legend container
+    legendContainer.classList.toggle("hidden");
+
+    // Update button text based on legend container visibility
+    if (legendContainer.classList.contains("hidden")) {
+      toggleButton.textContent = "Show Legend";
+    } else {
+      toggleButton.textContent = "Hide Legend";
+    }
+  }
+
+  function searchNode() {
+  const searchTerm = document.getElementById("node-search").value.trim().toLowerCase();
+  
+  // Check if nodes array is defined and not empty
+  if (nodes && nodes.length > 0) {
+    // Find the node by name
+    const foundNode = nodes.find(node => node.id.toLowerCase() === searchTerm);
+
+    // If node found, trigger click event on that node
+    if (foundNode) {
+      // Select the corresponding node element and trigger the 'clicked' function
+      const nodeElement = svg.selectAll(".node")
+                             .filter(d => d.id === foundNode.id);
+      if (!nodeElement.empty()) {
+        nodeElement.dispatch('click'); // Trigger the click event
+      } else {
+        console.log(`Node with id '${foundNode.id}' not found in the SVG.`);
+      }
+    } else {
+      console.log(`Node with id '${searchTerm}' not found.`);
+      // Handle case where node is not found (e.g., show message, clear selection)
+    }
+  } else {
+    console.log("Nodes array is empty or undefined.");
+    // Handle case where nodes array is empty or undefined
+  }
+}
+
   </script>
 </body>
 </html>
